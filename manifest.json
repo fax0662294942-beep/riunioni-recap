@@ -1,0 +1,14 @@
+{
+  "name": "RiunioniRecap",
+  "short_name": "Recap",
+  "description": "Registra riunioni, ottieni un recap tecnico per punti e prepara la mail di sintesi",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#1B1F3B",
+  "theme_color": "#1B1F3B",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

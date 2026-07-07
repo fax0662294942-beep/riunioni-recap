@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>RiunioniRecap</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#1B1F3B" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+<script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+
+<style>
+  :root {
+    --bg: #1B1F3B;
+    --bg-soft: #262c52;
+    --card: #2E355F;
+    --accent: #F2A65A;
+    --accent-2: #6FCF97;
+    --text: #EDEEF6;
+    --text-dim: #A9AEC9;
+    --danger: #E2685A;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  #root { min-height: 100vh; display: flex; flex-direction: column; }
+  .topbar {
+    padding: 18px 20px 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .topbar h1 { font-size: 20px; margin: 0; letter-spacing: 0.3px; }
+  .topbar .back { color: var(--accent); font-size: 15px; background: none; border: none; padding: 6px 0; }
+  .content { flex: 1; padding: 0 20px 30px 20px; overflow-y: auto; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: none;
+    border-radius: 999px;
+    padding: 14px 22px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+  }
+  .btn-primary { background: var(--accent); color: #1B1F3B; }
+  .btn-secondary { background: var(--bg-soft); color: var(--text); border: 1px solid #3c4370; }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn:disabled { opacity: 0.5; }
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    margin-bottom: 14px;
+  }
+  .meeting-item { cursor: pointer; }
+  .meeting-item .title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .meeting-item .meta { font-size: 12.5px; color: var(--text-dim); }
+  .empty {
+    text-align: center;
+    color: var(--text-dim);
+    padding: 60px 20px;
+    font-size: 14.5px;
+    line-height: 1.5;
+  }
+  .fab {
+    position: fixed;
+    right: 20px;
+    bottom: calc(24px + env(safe-area-inset-bottom));
+    background: var(--accent);
+    color: #1B1F3B;
+    border: none;
+    border-radius: 999px;
+    width: 58px;
+    height: 58px;
+    font-size: 28px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  }
+  .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+  .mode-card {
+    background: var(--bg-soft);
+    border: 2px solid transparent;
+    border-radius: var(--radius);
+    padding: 16px 12px;
+    text-align: center;
+    font-size: 13.5px;
+    color: var(--text-dim);
+  }
+  .mode-card.selected { border-color: var(--accent); color: var(--text); }
+  .mode-card .emoji { font-size: 26px; display: block; margin-bottom: 6px; }
+  input[type=text], textarea {
+    width: 100%;
+    background: var(--bg-soft);
+    border: 1px solid #3c4370;
+    border-radius: 10px;
+    color: var(--text);
+    padding: 12px 14px;
+    font-size: 15px;
+    font-family: inherit;
+    margin-bottom: 14px;
+  }
+  textarea { resize: vertical; min-height: 90px; }
+  label.field-label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 6px; }
+  .rec-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 30px 0 26px 0;
+  }
+  .dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--danger);
+  }
+  .dot.live { animation: pulse 1.2s infinite; }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(226,104,90,0.55); }
+    70% { box-shadow: 0 0 0 14px rgba(226,104,90,0); }
+    100% { box-shadow: 0 0 0 0 rgba(226,104,90,0); }
+  }
+  .timer { font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 700; }
+  .section-title {
+    font-size: 12.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--accent-2);
+    margin: 0 0 8px 0;
+    font-weight: 700;
+  }
+  ul.point-list { margin: 0; padding-left: 18px; }
+  ul.point-list li { margin-bottom: 6px; font-size: 14.5px; line-height: 1.4; }
+  .spinner {
+    width: 22px; height: 22px;
+    border: 3px solid rgba(237,238,246,0.25);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status-line { text-align: center; font-size: 13.5px; color: var(--text-dim); margin-top: 10px; }
+  .stack { display: flex; flex-direction: column; gap: 10px; }
+  .toast {
+    position: fixed;
+    left: 20px; right: 20px;
+    bottom: calc(24px + env(safe-area-inset-bottom));
+    background: #3c4370;
+    color: var(--text);
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react,env">
+/* @jsxRuntime classic */
+
+// ---------- FIREBASE CONFIG ----------
+// Sostituire con la configurazione reale del progetto "viaggi-camper"
+// (la stessa gia' usata in MoneyTracker / CamperHub / FoodJournal / Oroscopo)
+var firebaseConfig = {
+  apiKey: "REPLACE_ME",
+  authDomain: "viaggi-camper.firebaseapp.com",
+  projectId: "viaggi-camper",
+  storageBucket: "viaggi-camper.appspot.com",
+  messagingSenderId: "REPLACE_ME",
+  appId: "REPLACE_ME"
+};
+
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
+var db = firebase.firestore();
+var auth = firebase.auth();
+
+var MEETINGS_COLLECTION = "meetingRecap_meetings";
+
+// ---------- HELPERS ----------
+
+function formatDate(ts) {
+  var d = ts instanceof Date ? ts : new Date(ts);
+  var dd = String(d.getDate()).padStart(2, "0");
+  var mm = String(d.getMonth() + 1).padStart(2, "0");
+  var yyyy = d.getFullYear();
+  var hh = String(d.getHours()).padStart(2, "0");
+  var min = String(d.getMinutes()).padStart(2, "0");
+  return dd + "/" + mm + "/" + yyyy + " " + hh + ":" + min;
+}
+
+function formatTimer(seconds) {
+  var m = Math.floor(seconds / 60);
+  var s = seconds % 60;
+  return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+}
+
+function blobToBase64(blob) {
+  return new Promise(function (resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var result = reader.result;
+      resolve(result.split(",")[1]);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function getGeminiApiKey() {
+  var doc = await db.collection("config").doc("gemini").get();
+  if (!doc.exists) return null;
+  var data = doc.data();
+  return data.apiKey || data.key || data.geminiKey || null;
+}
+
+var RECAP_SCHEMA_PROMPT =
+  "Rispondi SOLO con un oggetto JSON valido, senza markdown, senza testo prima o dopo, con esattamente questi campi:\n" +
+  "{\n" +
+  '  "transcript": "trascrizione completa e pulita in italiano",\n' +
+  '  "decisions": ["decisione 1", "decisione 2"],\n' +
+  '  "actionItems": ["azione da fare - responsabile se menzionato"],\n' +
+  '  "technicalTopics": ["punto tecnico discusso 1", "punto tecnico discusso 2"],\n' +
+  '  "nextSteps": ["prossimo passo 1"],\n' +
+  '  "emailSubject": "oggetto email breve",\n' +
+  '  "emailBody": "corpo email di sintesi, tono professionale, con elenco puntato dei punti chiave, pronto da inviare"\n' +
+  "}\n" +
+  "Se una lista non ha elementi, restituisci un array vuoto. Non inventare contenuti non presenti nella riunione.";
+
+function extractJson(text) {
+  var cleaned = text.replace(/```json/g, "").replace(/```/g, "").trim();
+  var start = cleaned.indexOf("{");
+  var end = cleaned.lastIndexOf("}");
+  if (start === -1 || end === -1) throw new Error("JSON non trovato nella risposta");
+  return JSON.parse(cleaned.substring(start, end + 1));
+}
+
+async function callGeminiWithAudio(apiKey, base64Audio, mimeType) {
+  var model = "gemini-1.5-flash";
+  var url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + apiKey;
+  var body = {
+    contents: [
+      {
+        parts: [
+          { text: "Questo audio e' la registrazione di una riunione di lavoro, probabilmente con contenuti tecnici. Trascrivi e analizza. " + RECAP_SCHEMA_PROMPT },
+          { inline_data: { mime_type: mimeType, data: base64Audio } }
+        ]
+      }
+    ]
+  };
+  var res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    var errText = await res.text();
+    throw new Error("Errore Gemini (" + res.status + "): " + errText);
+  }
+  var data = await res.json();
+  var text = data.candidates[0].content.parts[0].text;
+  return extractJson(text);
+}
+
+async function callGeminiWithTranscript(apiKey, transcript) {
+  var model = "gemini-1.5-flash";
+  var url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + apiKey;
+  var prompt =
+    "Questa e' la trascrizione di una riunione di lavoro, probabilmente con contenuti tecnici:\n\n" +
+    transcript +
+    "\n\n" + RECAP_SCHEMA_PROMPT +
+    "\nPer il campo transcript restituisci esattamente il testo fornito sopra, eventualmente ripulito da ripetizioni evidenti.";
+  var body = { contents: [{ parts: [{ text: prompt }] }] };
+  var res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    var errText = await res.text();
+    throw new Error("Errore Gemini (" + res.status + "): " + errText);
+  }
+  var data = await res.json();
+  var text = data.candidates[0].content.parts[0].text;
+  return extractJson(text);
+}
+
+// ---------- COMPONENTI ----------
+
+function TopBar(props) {
+  return React.createElement(
+    "div",
+    { className: "topbar" },
+    props.onBack
+      ? React.createElement("button", { className: "back", onClick: props.onBack }, "‹ Indietro")
+      : React.createElement("div"),
+    React.createElement("h1", null, props.title),
+    React.createElement("div", { style: { width: 60 } })
+  );
+}
+
+function HomeScreen(props) {
+  var meetings = props.meetings;
+  if (!meetings) {
+    return React.createElement("div", { className: "content" },
+      React.createElement("div", { className: "spinner" })
+    );
+  }
+  if (meetings.length === 0) {
+    return React.createElement("div", { className: "content" },
+      React.createElement("div", { className: "empty" },
+        "Nessuna riunione registrata.",
+        React.createElement("br"),
+        "Tocca + per iniziare."
+      )
+    );
+  }
+  return React.createElement("div", { className: "content" },
+    meetings.map(function (m) {
+      return React.createElement(
+        "div",
+        { key: m.id, className: "card meeting-item", onClick: function () { props.onOpen(m); } },
+        React.createElement("div", { className: "title" }, m.title || "Riunione senza titolo"),
+        React.createElement("div", { className: "meta" }, formatDate(m.createdAt))
+      );
+    })
+  );
+}
+
+function ModeSelectScreen(props) {
+  var mode = props.mode;
+  var setMode = props.setMode;
+  var title = props.title;
+  var setTitle = props.setTitle;
+  return React.createElement("div", { className: "content" },
+    React.createElement("label", { className: "field-label" }, "Titolo riunione (opzionale)"),
+    React.createElement("input", {
+      type: "text",
+      value: title,
+      placeholder: "Es. Sync tecnico backend",
+      onChange: function (e) { setTitle(e.target.value); }
+    }),
+    React.createElement("label", { className: "field-label" }, "Come vuoi registrare?"),
+    React.createElement("div", { className: "mode-grid" },
+      React.createElement(
+        "div",
+        {
+          className: "mode-card" + (mode === "live" ? " selected" : ""),
+          onClick: function () { setMode("live"); }
+        },
+        React.createElement("span", { className: "emoji" }, "💬"),
+        React.createElement("div", null, "Live"),
+        React.createElement("div", { style: { fontSize: 11, marginTop: 4 } }, "Testo in tempo reale mentre parli")
+      ),
+      React.createElement(
+        "div",
+        {
+          className: "mode-card" + (mode === "record" ? " selected" : ""),
+          onClick: function () { setMode("record"); }
+        },
+        React.createElement("span", { className: "emoji" }, "🎙️"),
+        React.createElement("div", null, "Registra e invia"),
+        React.createElement("div", { style: { fontSize: 11, marginTop: 4 } }, "Piu' preciso, anche con piu' voci")
+      )
+    ),
+    React.createElement(
+      "button",
+      { className: "btn btn-primary", disabled: !mode, onClick: props.onNext },
+      "Continua"
+    )
+  );
+}
+
+function LiveRecordScreen(props) {
+  var recognitionRef = React.useRef(null);
+  var [listening, setListening] = React.useState(false);
+  var [seconds, setSeconds] = React.useState(0);
+  var [interim, setInterim] = React.useState("");
+  var transcript = props.transcript;
+  var setTranscript = props.setTranscript;
+  var timerRef = React.useRef(null);
+
+  React.useEffect(function () {
+    return function () {
+      if (recognitionRef.current) recognitionRef.current.stop();
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
+  function start() {
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      props.onError("Il riconoscimento vocale live non e' supportato su questo browser. Usa 'Registra e invia'.");
+      return;
+    }
+    var recognition = new SpeechRecognition();
+    recognition.lang = "it-IT";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.onresult = function (event) {
+      var interimText = "";
+      var finalText = "";
+      for (var i = event.resultIndex; i < event.results.length; i++) {
+        var res = event.results[i];
+        if (res.isFinal) {
+          finalText += res[0].transcript + " ";
+        } else {
+          interimText += res[0].transcript;
+        }
+      }
+      if (finalText) {
+        setTranscript(function (prev) { return (prev + " " + finalText).trim(); });
+      }
+      setInterim(interimText);
+    };
+    recognition.onerror = function (event) {
+      if (event.error !== "no-speech") {
+        props.onError("Errore riconoscimento vocale: " + event.error);
+      }
+    };
+    recognition.onend = function () {
+      if (listening) {
+        try { recognition.start(); } catch (e) {}
+      }
+    };
+    recognition.start();
+    recognitionRef.current = recognition;
+    setListening(true);
+    timerRef.current = setInterval(function () {
+      setSeconds(function (s) { return s + 1; });
+    }, 1000);
+  }
+
+  function stop() {
+    setListening(false);
+    if (recognitionRef.current) recognitionRef.current.stop();
+    if (timerRef.current) clearInterval(timerRef.current);
+  }
+
+  return React.createElement("div", { className: "content" },
+    React.createElement("div", { className: "rec-indicator" },
+      React.createElement("div", { className: "dot" + (listening ? " live" : "") }),
+      React.createElement("div", { className: "timer" }, formatTimer(seconds))
+    ),
+    React.createElement("div", { className: "card" },
+      React.createElement("div", { className: "section-title" }, "Trascrizione"),
+      React.createElement("div", { style: { fontSize: 14.5, lineHeight: 1.5, minHeight: 60 } },
+        transcript || React.createElement("span", { style: { color: "var(--text-dim)" } }, "Tocca Avvia e inizia a parlare..."),
+        interim ? React.createElement("span", { style: { color: "var(--text-dim)" } }, " " + interim) : null
+      )
+    ),
+    React.createElement("div", { className: "stack" },
+      !listening
+        ? React.createElement("button", { className: "btn btn-primary", onClick: start }, "🎙️ Avvia")
+        : React.createElement("button", { className: "btn btn-danger", onClick: stop }, "⏹ Ferma"),
+      React.createElement(
+        "button",
+        {
+          className: "btn btn-secondary",
+          disabled: listening || !transcript,
+          onClick: props.onGenerate
+        },
+        "Genera recap tecnico"
+      )
+    )
+  );
+}
+
+function RecordAudioScreen(props) {
+  var mediaRecorderRef = React.useRef(null);
+  var chunksRef = React.useRef([]);
+  var [recording, setRecording] = React.useState(false);
+  var [seconds, setSeconds] = React.useState(0);
+  var timerRef = React.useRef(null);
+  var audioBlob = props.audioBlob;
+  var setAudioBlob = props.setAudioBlob;
+
+  React.useEffect(function () {
+    return function () {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
+  async function start() {
+    try {
+      var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      var mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+      var recorder = mimeType ? new MediaRecorder(stream, { mimeType: mimeType }) : new MediaRecorder(stream);
+      chunksRef.current = [];
+      recorder.ondataavailable = function (e) {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.onstop = function () {
+        var blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        setAudioBlob(blob);
+        stream.getTracks().forEach(function (t) { t.stop(); });
+      };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setRecording(true);
+      setSeconds(0);
+      timerRef.current = setInterval(function () {
+        setSeconds(function (s) { return s + 1; });
+      }, 1000);
+    } catch (e) {
+      props.onError("Impossibile accedere al microfono: " + e.message);
+    }
+  }
+
+  function stop() {
+    if (mediaRecorderRef.current) mediaRecorderRef.current.stop();
+    setRecording(false);
+    if (timerRef.current) clearInterval(timerRef.current);
+  }
+
+  return React.createElement("div", { className: "content" },
+    React.createElement("div", { className: "rec-indicator" },
+      React.createElement("div", { className: "dot" + (recording ? " live" : "") }),
+      React.createElement("div", { className: "timer" }, formatTimer(seconds))
+    ),
+    React.createElement("div", { className: "card" },
+      React.createElement("div", { className: "section-title" }, "Stato"),
+      React.createElement("div", { style: { fontSize: 14.5, color: "var(--text-dim)" } },
+        recording
+          ? "Registrazione in corso..."
+          : (audioBlob ? "Audio pronto (" + Math.round(audioBlob.size / 1024) + " KB)" : "Tocca Avvia per registrare l'audio della riunione")
+      )
+    ),
+    React.createElement("div", { className: "stack" },
+      !recording
+        ? React.createElement("button", { className: "btn btn-primary", onClick: start }, "🎙️ Avvia registrazione")
+        : React.createElement("button", { className: "btn btn-danger", onClick: stop }, "⏹ Ferma registrazione"),
+      React.createElement(
+        "button",
+        {
+          className: "btn btn-secondary",
+          disabled: recording || !audioBlob,
+          onClick: props.onGenerate
+        },
+        "Genera recap tecnico"
+      )
+    )
+  );
+}
+
+function ProcessingScreen() {
+  return React.createElement("div", { className: "content", style: { paddingTop: 60 } },
+    React.createElement("div", { className: "spinner" }),
+    React.createElement("div", { className: "status-line" }, "Elaborazione con Gemini in corso...")
+  );
+}
+
+function RecapEditableList(props) {
+  var items = props.items;
+  var setItems = props.setItems;
+  function updateItem(i, value) {
+    var next = items.slice();
+    next[i] = value;
+    setItems(next);
+  }
+  function removeItem(i) {
+    var next = items.slice();
+    next.splice(i, 1);
+    setItems(next);
+  }
+  function addItem() {
+    setItems(items.concat(""));
+  }
+  return React.createElement("div", null,
+    items.map(function (item, i) {
+      return React.createElement("div", { key: i, style: { display: "flex", gap: 6, marginBottom: 8 } },
+        React.createElement("input", {
+          type: "text",
+          value: item,
+          onChange: function (e) { updateItem(i, e.target.value); },
+          style: { marginBottom: 0 }
+        }),
+        React.createElement("button", {
+          className: "btn btn-secondary",
+          style: { width: 44, padding: 0, flexShrink: 0 },
+          onClick: function () { removeItem(i); }
+        }, "✕")
+      );
+    }),
+    React.createElement("button", { className: "btn btn-secondary", onClick: addItem }, "+ Aggiungi punto")
+  );
+}
+
+function RecapResultScreen(props) {
+  var recap = props.recap;
+  var setRecap = props.setRecap;
+  var [toast, setToast] = React.useState("");
+
+  function set(field, value) {
+    var next = Object.assign({}, recap);
+    next[field] = value;
+    setRecap(next);
+  }
+
+  function openMail() {
+    var subject = encodeURIComponent(recap.emailSubject || "Recap riunione");
+    var body = encodeURIComponent(recap.emailBody || "");
+    window.location.href = "mailto:?subject=" + subject + "&body=" + body;
+  }
+
+  function copyEmail() {
+    var full = (recap.emailSubject || "") + "\n\n" + (recap.emailBody || "");
+    navigator.clipboard.writeText(full).then(function () {
+      setToast("Email copiata negli appunti");
+      setTimeout(function () { setToast(""); }, 2000);
+    });
+  }
+
+  return React.createElement("div", { className: "content" },
+    React.createElement("div", { className: "card" },
+      React.createElement("div", { className: "section-title" }, "Decisioni"),
+      React.createElement(RecapEditableList, {
+        items: recap.decisions,
+        setItems: function (v) { set("decisions", v); }
+      })
+    ),
+    React.createElement("div", { className: "card" },
+      React.createElement("div", { className: "section-title" }, "Action item"),
+      React.createElement(RecapEditableList, {
+        items: recap.actionItems,
+        setItems: function (v) { set("actionItems", v); }
+      })
+    ),
+    React.createElement("div", { className: "card" },
+      React.createElement("div", { className: "section-title" }, "Temi tecnici"),
+      React.createElement(RecapEditableList, {
+        items: recap.technicalTopics,
+        setItems: function (v) { set("technicalTopics", v); }
+      })
+    ),
+    React.createElement("div", { className: "card" },
+      React.createElement("div", { className: "section-title" }, "Prossimi passi"),
+      React.createElement(RecapEditableList, {
+        items: recap.nextSteps,
+        setItems: function (v) { set("nextSteps", v); }
+      })
+    ),
+    React.createElement("div", { className: "card" },
+      React.createElement("div", { className: "section-title" }, "Bozza email"),
+      React.createElement("label", { className: "field-label" }, "Oggetto"),
+      React.createElement("input", {
+        type: "text",
+        value: recap.emailSubject || "",
+        onChange: function (e) { set("emailSubject", e.target.value); }
+      }),
+      React.createElement("label", { className: "field-label" }, "Corpo"),
+      React.createElement("textarea", {
+        value: recap.emailBody || "",
+        rows: 8,
+        onChange: function (e) { set("emailBody", e.target.value); }
+      })
+    ),
+    React.createElement("div", { className: "stack", style: { marginTop: 4 } },
+      React.createElement("button", { className: "btn btn-primary", onClick: openMail }, "✉️ Apri mail"),
+      React.createElement("button", { className: "btn btn-secondary", onClick: copyEmail }, "Copia testo email"),
+      React.createElement("button", { className: "btn btn-secondary", onClick: props.onSave }, "💾 Salva riunione")
+    ),
+    toast ? React.createElement("div", { className: "toast" }, toast) : null
+  );
+}
+
+function App() {
+  var [view, setView] = React.useState("home");
+  var [meetings, setMeetings] = React.useState(null);
+  var [title, setTitle] = React.useState("");
+  var [mode, setMode] = React.useState(null);
+  var [transcript, setTranscript] = React.useState("");
+  var [audioBlob, setAudioBlob] = React.useState(null);
+  var [recap, setRecap] = React.useState(null);
+  var [error, setError] = React.useState("");
+
+  React.useEffect(function () {
+    auth.signInAnonymously().catch(function (e) {
+      setError("Errore login: " + e.message);
+    });
+  }, []);
+
+  React.useEffect(function () {
+    if (view !== "home") return;
+    var unsub = db.collection(MEETINGS_COLLECTION)
+      .orderBy("createdAt", "desc")
+      .onSnapshot(function (snap) {
+        var list = [];
+        snap.forEach(function (doc) {
+          var data = doc.data();
+          list.push({
+            id: doc.id,
+            title: data.title,
+            createdAt: data.createdAt ? data.createdAt.toDate() : new Date(),
+            recap: data.recap
+          });
+        });
+        setMeetings(list);
+      }, function (e) {
+        setError("Errore caricamento riunioni: " + e.message);
+      });
+    return unsub;
+  }, [view]);
+
+  function resetNewMeeting() {
+    setTitle("");
+    setMode(null);
+    setTranscript("");
+    setAudioBlob(null);
+    setRecap(null);
+  }
+
+  function startNewMeeting() {
+    resetNewMeeting();
+    setView("modeSelect");
+  }
+
+  function goToRecording() {
+    setView(mode === "live" ? "liveRecord" : "recordAudio");
+  }
+
+  async function generateFromLive() {
+    setView("processing");
+    try {
+      var apiKey = await getGeminiApiKey();
+      if (!apiKey) throw new Error("Chiave Gemini non trovata in config/gemini su Firestore");
+      var result = await callGeminiWithTranscript(apiKey, transcript);
+      setRecap(result);
+      setView("result");
+    } catch (e) {
+      setError(e.message);
+      setView("liveRecord");
+    }
+  }
+
+  async function generateFromAudio() {
+    setView("processing");
+    try {
+      var apiKey = await getGeminiApiKey();
+      if (!apiKey) throw new Error("Chiave Gemini non trovata in config/gemini su Firestore");
+      var base64 = await blobToBase64(audioBlob);
+      var mimeType = audioBlob.type || "audio/webm";
+      var result = await callGeminiWithAudio(apiKey, base64, mimeType);
+      setRecap(result);
+      setView("result");
+    } catch (e) {
+      setError(e.message);
+      setView("recordAudio");
+    }
+  }
+
+  async function saveMeeting() {
+    try {
+      await db.collection(MEETINGS_COLLECTION).add({
+        title: title || "Riunione senza titolo",
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        recap: recap
+      });
+      setView("home");
+    } catch (e) {
+      setError("Errore salvataggio: " + e.message);
+    }
+  }
+
+  function openMeeting(m) {
+    setTitle(m.title);
+    setRecap(m.recap);
+    setView("result");
+  }
+
+  var screen = null;
+  var barTitle = "RiunioniRecap";
+  var onBack = null;
+
+  if (view === "home") {
+    screen = React.createElement(HomeScreen, { meetings: meetings, onOpen: openMeeting });
+  } else if (view === "modeSelect") {
+    barTitle = "Nuova riunione";
+    onBack = function () { setView("home"); };
+    screen = React.createElement(ModeSelectScreen, {
+      mode: mode, setMode: setMode, title: title, setTitle: setTitle, onNext: goToRecording
+    });
+  } else if (view === "liveRecord") {
+    barTitle = "Registrazione live";
+    onBack = function () { setView("modeSelect"); };
+    screen = React.createElement(LiveRecordScreen, {
+      transcript: transcript, setTranscript: setTranscript,
+      onGenerate: generateFromLive, onError: setError
+    });
+  } else if (view === "recordAudio") {
+    barTitle = "Registra e invia";
+    onBack = function () { setView("modeSelect"); };
+    screen = React.createElement(RecordAudioScreen, {
+      audioBlob: audioBlob, setAudioBlob: setAudioBlob,
+      onGenerate: generateFromAudio, onError: setError
+    });
+  } else if (view === "processing") {
+    barTitle = "Elaborazione";
+    screen = React.createElement(ProcessingScreen);
+  } else if (view === "result") {
+    barTitle = title || "Recap";
+    onBack = function () { setView("home"); };
+    screen = React.createElement(RecapResultScreen, {
+      recap: recap, setRecap: setRecap, onSave: saveMeeting
+    });
+  }
+
+  return React.createElement(React.Fragment, null,
+    React.createElement(TopBar, { title: barTitle, onBack: onBack }),
+    screen,
+    view === "home" ? React.createElement("button", { className: "fab", onClick: startNewMeeting }, "+") : null,
+    error ? React.createElement("div", { className: "toast", style: { background: "var(--danger)" }, onClick: function () { setError(""); } }, error) : null
+  );
+}
+
+var root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(App));
+</script>
+
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js", { updateViaCache: "none" });
+    });
+  }
+</script>
+</body>
+</html>
